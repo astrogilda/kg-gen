@@ -116,29 +116,31 @@ class KGGen:
         self.validate_max_tokens(self.max_tokens)
 
         # Initialize dspy LM with current settings
+        # Handle reasoning: gpt-5 models REQUIRE it, gpt-4o rejects it
+        # Note: OpenAI Responses API moved reasoning_effort to reasoning.effort (nested format)
+        is_gpt5 = "gpt-5" in self.model
+        lm_kwargs = {
+            "model": self.model,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            "api_base": self.api_base,
+            "cache": not self.disable_cache,
+            "model_type": "responses" if is_gpt5 else "chat",
+        }
         if self.api_key:
-            self.lm = dspy.LM(
-                model=self.model,
-                api_key=self.api_key,
-                reasoning_effort=self.reasoning_effort,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                api_base=self.api_base,
-                cache=not self.disable_cache,
-                model_type="responses" if self.model.startswith("gpt-5") else "chat",
-                allowed_openai_params=["reasoning_effort"],
-            )
-        else:
-            self.lm = dspy.LM(
-                model=self.model,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens,
-                api_base=self.api_base,
-                reasoning_effort=self.reasoning_effort,
-                cache=not self.disable_cache,
-                model_type="responses" if self.model.startswith("gpt-5") else "chat",
-                allowed_openai_params=["reasoning_effort"],
-            )
+            lm_kwargs["api_key"] = self.api_key
+        # gpt-5 models require reasoning, default to "high" if not provided
+        # Use new nested format: reasoning={"effort": "high"}
+        if is_gpt5:
+            effort = self.reasoning_effort or "high"
+            lm_kwargs["reasoning"] = {"effort": effort}
+            lm_kwargs["allowed_openai_params"] = ["reasoning"]
+        elif self.reasoning_effort is not None:
+            # Non-gpt-5 model with explicit reasoning (unusual but supported)
+            lm_kwargs["reasoning"] = {"effort": self.reasoning_effort}
+            lm_kwargs["allowed_openai_params"] = ["reasoning"]
+
+        self.lm = dspy.LM(**lm_kwargs)
 
     @staticmethod
     def from_file(file_path: str) -> Graph:
