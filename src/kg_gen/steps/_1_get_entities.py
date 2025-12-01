@@ -3,8 +3,7 @@ import dspy
 
 
 class TextEntities(dspy.Signature):
-    """Extract key entities from the source text. Extracted entities are subjects or objects.
-    This is for an extraction task, please be THOROUGH and accurate to the reference text."""
+    """Extract key entities from the given text. Extracted entities are nouns, verbs, or adjectives, particularly regarding sentiment. This is for an extraction task, please be thorough and accurate to the reference text."""
 
     source_text: str = dspy.InputField()
     entities: list[str] = dspy.OutputField(desc="THOROUGH list of key entities")

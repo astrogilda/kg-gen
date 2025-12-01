@@ -9,9 +9,7 @@ def extraction_sig(
     if not is_conversation:
 
         class ExtractTextRelations(dspy.Signature):
-            __doc__ = f"""Extract subject-predicate-object triples from the source text. 
-      Subject and object must be from entities list. Entities provided were previously extracted from the same source text.
-      This is for an extraction task, please be thorough, accurate, and faithful to the reference text. {context}"""
+            __doc__ = f"""Extract subject-predicate-object triples from the source text. A predicate (1-3 words) defines the relationship between the subject and object. Relationship may be fact or sentiment based. Subject and object must be from entities list. Entities provided were previously extracted from the same source text, though you may not need all of them. This is for an extraction task, please be thorough, accurate, and faithful to the reference text. {context}"""
 
             source_text: str = dspy.InputField()
             entities: list[str] = dspy.InputField()
