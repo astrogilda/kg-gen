@@ -6,16 +6,26 @@ import numpy as np
 import networkx as nx
 from kg_gen.kg_gen import KGGen
 import json
+import logging
 import sys
 import os
 from typing import Literal
 import typer
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 # Add the src directory to Python path to import from source code
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 load_dotenv()
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger(__name__)
 
 # Configure DSPy with OpenAI
 lm = dspy.LM(
@@ -161,6 +171,40 @@ def main(
     deduplication_method: Literal["semhash", "full"] | None = "semhash",
     max_workers: int = 64,
 ):
+    # Build directory name based on evaluation model
+    if evaluation_model == "local":
+        # Build directory name from model config
+        dir_name = model.replace("/", "-")
+        if reasoning_effort:
+            dir_name += f"-{reasoning_effort}"
+        dir_name += f"-{temperature}"
+        if deduplication_method:
+            dir_name += f"-{deduplication_method}"
+    else:
+        # For pre-generated KGs from HuggingFace dataset
+        dir_name = f"hf-{evaluation_model}"
+
+    # Setup file logging to results directory
+    results_dir = Path(f"experiments/MINE/results/{dir_name}")
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    # Separate log files for generation and evaluation
+    if evaluation_model == "local":
+        log_file = results_dir / "kg_generation.log"
+    else:
+        log_file = results_dir / "evaluation.log"
+
+    file_handler = logging.FileHandler(log_file, mode='w')
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%H:%M:%S"
+    ))
+    logging.getLogger().addHandler(file_handler)
+    logger.info(f"Logging to file: {log_file}")
+    logger.info(f"Model: {model}, Evaluation: {evaluation_model}, Workers: {max_workers}")
+    logger.info(f"Deduplication: {deduplication_method}, Temperature: {temperature}")
+
     # Load data from Hugging Face (with local fallback)
     dataset = load_dataset("josancamon/kg-gen-MINE-evaluation-dataset")["train"]
     queries = [item["generated_queries"] for item in dataset.to_list()]
@@ -187,6 +231,7 @@ def main(
         (kg, queries) for kg, queries in zip(kg_data, queries) if kg is not None
     ]
 
+    logger.info(f"Processing {len(valid_pairs)} evaluations with {max_workers} workers...")
     print(f"Processing {len(valid_pairs)} evaluations with {max_workers} workers...")
 
     # Process evaluations in parallel using ThreadPoolExecutor
@@ -214,9 +259,13 @@ def main(
             completed += 1
             i, success, message = future.result()
             status = "✓" if success else "✗"
-            print(f"[{completed}/{len(valid_pairs)}] {status} {message}")
+            log_message = f"[{completed}/{len(valid_pairs)}] {status} {message}"
+            print(log_message)
+            logger.info(log_message)
 
-    print(f"\nCompleted all {len(valid_pairs)} evaluations!")
+    completion_message = f"\nCompleted all {len(valid_pairs)} evaluations!"
+    print(completion_message)
+    logger.info(completion_message)
 
 
 if __name__ == "__main__":
