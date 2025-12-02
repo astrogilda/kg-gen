@@ -9,6 +9,7 @@ import json
 import logging
 import sys
 import os
+import time
 from typing import Literal
 import typer
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -234,6 +235,9 @@ def main(
     logger.info(f"Processing {len(valid_pairs)} evaluations with {max_workers} workers...")
     print(f"Processing {len(valid_pairs)} evaluations with {max_workers} workers...")
 
+    # Record start time
+    start_time = time.time()
+
     # Process evaluations in parallel using ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         # Submit all tasks
@@ -266,6 +270,23 @@ def main(
     completion_message = f"\nCompleted all {len(valid_pairs)} evaluations!"
     print(completion_message)
     logger.info(completion_message)
+
+    # Calculate and log total execution time
+    end_time = time.time()
+    total_seconds = int(end_time - start_time)
+    minutes, seconds = divmod(total_seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+
+    if hours > 0:
+        time_str = f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        time_str = f"{minutes}m {seconds}s"
+    else:
+        time_str = f"{seconds}s"
+
+    timing_message = f"Total execution time: {time_str}"
+    print(timing_message)
+    logger.info(timing_message)
 
 
 if __name__ == "__main__":
